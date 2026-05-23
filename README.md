@@ -15,7 +15,7 @@ commands, user-facing UX, or performance gates. Those stay in Hypersync.
 Current consumers still include Filer through the shared workspace build:
 
 ```text
-piper/src -> connector/src -> filer/src -> hypersync/src
+piper/src -> utils/src -> connector/src -> filer/src -> hypersync/src
 ```
 
 The C++ namespace remains `hypersync` during this extraction phase so the move
