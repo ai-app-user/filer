@@ -14,7 +14,6 @@
 #include "common/buffer_pool.hpp"
 #include "common/types.hpp"
 #include "core/pipeline_buffers.hpp"
-#include "jobs/queue_job.hpp"
 #include "jobs/threaded_job.hpp"
 
 namespace hypersync {
@@ -32,13 +31,13 @@ struct DataWriterConfig {
 
 [[nodiscard]] DataWriterConfig load_data_writer_config(const ConfigStore& config);
 
-class DataWriter : public TypedQueueJob<DataChunk> {
+class DataWriter {
 public:
     explicit DataWriter(DataWriterConfig config = {});
 
     void predeclare_directory(std::string path);
     [[nodiscard]] bool known_directory(std::string_view path) const;
-    void queue_chunk(DataChunk chunk);
+    DataChunk process_chunk(DataChunk chunk);
     [[nodiscard]] ChunkProgress progress_for(std::uint64_t file_id) const;
     [[nodiscard]] std::size_t completed_files() const;
     [[nodiscard]] const DataWriterConfig& config() const;

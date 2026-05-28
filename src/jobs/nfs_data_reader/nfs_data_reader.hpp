@@ -11,7 +11,6 @@
 #include "common/buffer_pool.hpp"
 #include "common/slot_pool.hpp"
 #include "common/types.hpp"
-#include "jobs/queue_job.hpp"
 
 namespace hypersync {
 
@@ -55,7 +54,7 @@ struct NfsDataReaderConfig {
 
 [[nodiscard]] NfsDataReaderConfig load_nfs_data_reader_config(const ConfigStore& config);
 
-class NfsDataReader : public TypedQueueJob<DataChunk> {
+class NfsDataReader {
 public:
     explicit NfsDataReader(NfsDataReaderConfig config = {});
     ~NfsDataReader();
@@ -99,8 +98,6 @@ public:
         const FileSpec& file,
         const std::function<void(std::uint64_t offset, std::string_view data)>& data_visitor) const;
     [[nodiscard]] std::vector<DataChunk> read_file(std::string_view rel_path) const;
-    void publish_file(const FileSpec& file);
-    void publish_path(std::string_view rel_path);
     [[nodiscard]] bool should_pause(double large_pool_usage_percent) const;
     [[nodiscard]] bool should_resume(double large_pool_usage_percent) const;
     [[nodiscard]] bool using_async_backend() const;

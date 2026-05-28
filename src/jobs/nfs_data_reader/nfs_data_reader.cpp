@@ -55,8 +55,7 @@ NfsDataReaderConfig load_nfs_data_reader_config(const ConfigStore& config) {
 }
 
 NfsDataReader::NfsDataReader(NfsDataReaderConfig config)
-    : TypedQueueJob("nfs_data_reader", message_kinds::data_chunk),
-      config_(std::move(config)),
+    : config_(std::move(config)),
       backend_(make_nfs_backend(config_.source_root, config_.endpoint_index)) {}
 
 NfsDataReader::~NfsDataReader() = default;
@@ -188,18 +187,6 @@ std::uint64_t NfsDataReader::visit_file_chunks(
 
 std::vector<DataChunk> NfsDataReader::read_file(std::string_view rel_path) const {
     return chunk_file(load_file(rel_path));
-}
-
-void NfsDataReader::publish_file(const FileSpec& file) {
-    for (auto& chunk : chunk_file(file)) {
-        publish_item(std::move(chunk));
-    }
-}
-
-void NfsDataReader::publish_path(std::string_view rel_path) {
-    for (auto& chunk : read_file(rel_path)) {
-        publish_item(std::move(chunk));
-    }
 }
 
 bool NfsDataReader::should_pause(double large_pool_usage_percent) const {

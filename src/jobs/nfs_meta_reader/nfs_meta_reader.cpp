@@ -1,5 +1,7 @@
 #include "jobs/nfs_meta_reader/nfs_meta_reader.hpp"
 
+#include <utility>
+
 #include "common/config.hpp"
 #include "core/nfs_backend.hpp"
 #include "common/records.hpp"
@@ -44,8 +46,7 @@ NfsMetaReaderConfig load_nfs_meta_reader_config(const ConfigStore& config) {
 }
 
 NfsMetaReader::NfsMetaReader(NfsMetaReaderConfig config)
-    : TypedQueueJob("nfs_meta_reader", message_kinds::file_record),
-      config_(std::move(config)),
+    : config_(std::move(config)),
       backend_(make_nfs_backend(config_.source_root, kNfsEndpointAny, config_.readdirplus_page_bytes)) {}
 
 NfsMetaReader::~NfsMetaReader() = default;
@@ -54,41 +55,38 @@ std::vector<FileSpec> NfsMetaReader::scan_tree() const {
     return backend().list_files(config_.recursive);
 }
 
-void NfsMetaReader::publish_tree() {
+void NfsMetaReader::visit_tree(const std::function<void(RecBuf)>& file_visitor,
+                               const std::function<void(FolderRecord)>& folder_visitor) {
     if (active_folder_.has_value()) {
         std::uint64_t files_total = 0;
         backend().visit_folder(
             active_folder_->rel_path,
-            [this, &files_total](FileSpec spec) {
+            [this, &files_total, &file_visitor](FileSpec spec) {
                 ++files_total;
-                publish_record(make_recbuf(spec));
+                ++files_seen_;
+                file_visitor(make_recbuf(spec));
             },
-            [this](FileSpec spec) {
+            [this, &folder_visitor](FileSpec spec) {
                 FolderRecord child;
                 child.rel_path = spec.rel_path;
                 child.recursive = config_.recursive;
                 discover_child_folder(std::move(child));
+                folder_visitor(discovered_children_.back());
             });
         finish_folder(files_total);
         return;
     }
 
-    backend().visit_files(config_.recursive, [this](FileSpec spec) {
-        publish_record(make_recbuf(spec));
-    });
-}
-
-void NfsMetaReader::stream_tree_to(Job& downstream) {
     backend().visit_metadata(
         config_.recursive,
-        [this, &downstream](FileSpec spec) {
+        [this, &file_visitor](FileSpec spec) {
             ++files_seen_;
-            downstream.push_back(JobMessage{message_kinds::file_record, make_recbuf(spec)});
+            file_visitor(make_recbuf(spec));
         },
-        [&downstream](FileSpec spec) {
+        [&folder_visitor](FileSpec spec) {
             FolderRecord folder;
             folder.rel_path = spec.rel_path;
-            downstream.push_back(JobMessage{message_kinds::folder_record, std::move(folder)});
+            folder_visitor(std::move(folder));
         });
 }
 
@@ -100,9 +98,8 @@ void NfsMetaReader::begin_folder(FolderRecord folder) {
     active_folder_ = std::move(folder);
 }
 
-void NfsMetaReader::publish_record(RecBuf record) {
+void NfsMetaReader::record_file_seen() {
     ++files_seen_;
-    publish_item(std::move(record));
 }
 
 void NfsMetaReader::discover_child_folder(FolderRecord child) {

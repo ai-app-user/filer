@@ -3,13 +3,13 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
 #include <vector>
 
 #include "common/types.hpp"
-#include "jobs/queue_job.hpp"
 
 namespace hypersync {
 
@@ -40,18 +40,18 @@ struct NfsMetaReaderConfig {
 
 [[nodiscard]] NfsMetaReaderConfig load_nfs_meta_reader_config(const ConfigStore& config);
 
-class NfsMetaReader : public TypedQueueJob<RecBuf> {
+class NfsMetaReader {
 public:
     explicit NfsMetaReader(NfsMetaReaderConfig config = {});
     ~NfsMetaReader();
 
     [[nodiscard]] std::vector<FileSpec> scan_tree() const;
-    void publish_tree();
-    void stream_tree_to(Job& downstream);
+    void visit_tree(const std::function<void(RecBuf)>& file_visitor,
+                    const std::function<void(FolderRecord)>& folder_visitor);
     [[nodiscard]] bool using_async_backend() const;
 
     void begin_folder(FolderRecord folder);
-    void publish_record(RecBuf record);
+    void record_file_seen();
     void discover_child_folder(FolderRecord child);
     void finish_folder(std::uint64_t files_total);
 

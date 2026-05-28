@@ -95,7 +95,7 @@ DataWriterConfig load_data_writer_config(const ConfigStore& config) {
 }
 
 DataWriter::DataWriter(DataWriterConfig config)
-    : TypedQueueJob("data_writer", message_kinds::data_chunk), config_(std::move(config)) {}
+    : config_(std::move(config)) {}
 
 void DataWriter::predeclare_directory(std::string path) {
     dir_cache_.insert(normalize_path(path));
@@ -105,7 +105,7 @@ bool DataWriter::known_directory(std::string_view path) const {
     return dir_cache_.find(normalize_path(path)) != dir_cache_.end();
 }
 
-void DataWriter::queue_chunk(DataChunk chunk) {
+DataChunk DataWriter::process_chunk(DataChunk chunk) {
     const std::string dir = parent_path(chunk.trailer.rel_path);
     if (!known_directory(dir)) {
         predeclare_directory(dir);
@@ -121,7 +121,7 @@ void DataWriter::queue_chunk(DataChunk chunk) {
         ++completed_files_;
     }
 
-    publish_item(std::move(chunk));
+    return chunk;
 }
 
 ChunkProgress DataWriter::progress_for(std::uint64_t file_id) const {
